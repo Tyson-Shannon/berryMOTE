@@ -1,2 +1,5 @@
 # berryMOTE
-A remote controller for you computer hosted on a local server and accessed by any browser on any device (From berryTV)
+A remote controller for you computer hosted on a local server and accessed by any browser on any device <br/>
+Same remote functionality as seen in the [berryTV](https://github.com/Tyson-Shannon/berryTV) project that turns your linux device into a smart TV <br/><br/>
+![image](https://github.com/user-attachments/assets/8ad0834a-85b5-48aa-976d-4b03fa165142) <br/><br/>
+<img src="https://github.com/user-attachments/assets/4022920a-eab3-4a3e-895a-d09decce7954" alt="remote" style="width:50%; height:auto;">
