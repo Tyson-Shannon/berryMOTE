@@ -7,6 +7,7 @@ By Tyson Shannon
 A server to host a remote control for you're computer
 '''
 import sys
+import os
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
@@ -15,6 +16,17 @@ from flask import Flask, render_template_string, request
 from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController, Key
 import threading
+
+#get resource path
+def resource_path(relative_path):
+    try:
+        #when bundled with PyInstaller
+        base_path = sys._MEIPASS
+    except AttributeError:
+        #when running in a normal Python environment
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 #remote
 class Remote:
@@ -271,7 +283,7 @@ class gui(QWidget):
       layout.setSpacing(20)
       #left side 
       self.label = QLabel(self)
-      self.OG_pixmap = QPixmap("berryTV.png")
+      self.OG_pixmap = QPixmap(resource_path("berryTV.png"))
       pixmap = self.OG_pixmap.scaledToWidth(width // 2, Qt.SmoothTransformation)
       self.label.setPixmap(pixmap)
       self.label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
