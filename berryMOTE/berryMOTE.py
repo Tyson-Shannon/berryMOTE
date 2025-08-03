@@ -1,13 +1,16 @@
 '''
 berryMOTE
-v1.0.0
+v1.1.0
 Version Name: June Berry (V1)
 By Tyson Shannon
 
-A server to host a remote control for you're computer
+A server to host a remote control for you're computer 
+(Linux compatible)
 '''
 import sys
 import os
+import platform
+import subprocess
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
@@ -16,6 +19,30 @@ from flask import Flask, render_template_string, request
 from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController, Key
 import threading
+
+#environment detection to determine if os uses wayland or not
+def is_wayland():
+    return bool(os.environ.get("WAYLAND_DISPLAY")) and not os.environ.get("DISPLAY")
+
+#ydotool wayland functions
+def ydotool_cmd(*args):
+    #Run ydotool command if available
+    try:
+        subprocess.run(["ydotool"] + list(args), check=True)
+    except Exception as e:
+        print("ydotool error:", e)
+def ydotool_move(dx, dy):
+    #move relative
+    ydotool_cmd("mousemove", "--", str(dx), str(dy))
+def ydotool_click(button="left"):
+    if button == "left":
+        ydotool_cmd("click", "0")
+    else:
+        ydotool_cmd("click", "1")
+def ydotool_type(text):
+    #type text one character at a time
+    for ch in text:
+        ydotool_cmd("type", ch)
 
 #get resource path
 def resource_path(relative_path):
@@ -222,6 +249,34 @@ class Remote:
         action = data.get("action")
         key_data = data.get("data", "")
 
+        #if wayland detected
+        if is_wayland():
+            if action == "move":
+                dx = key_data.get("dx", 0)
+                dy = key_data.get("dy", 0)
+                factor = 1.0 #sensitivity boost
+                ydotool_move(int(dx * factor), int(dy * factor))
+            elif action == "click":
+                ydotool_click("left")
+            elif action == "right_click":
+                ydotool_click("right")
+            elif action == "scroll_up":
+                ydotool_cmd("mousemove", "0", "-50")
+            elif action == "scroll_down":
+                ydotool_cmd("mousemove", "0", "50")
+            elif action == "type" and key_data:
+                ydotool_type(key_data)
+            elif action == "backspace":
+                ydotool_cmd("key", "14")
+            elif action == "volume_up":
+                os.system("pactl set-sink-volume @DEFAULT_SINK@ +5%")
+            elif action == "volume_down":
+                os.system("pactl set-sink-volume @DEFAULT_SINK@ -5%")
+            elif action == "volume_toggle_mute":
+                os.system("pactl set-sink-mute @DEFAULT_SINK@ toggle")
+            return "OK"
+
+        #if NO wayland detected (X11/Windows)
         if action == "move":
             dx = key_data.get("dx", 0)
             dy = key_data.get("dy", 0)
@@ -241,14 +296,23 @@ class Remote:
             self.keyboard.press(Key.backspace)
             self.keyboard.release(Key.backspace)
         elif action == "volume_up":
-            self.keyboard.press(Key.media_volume_up)
-            self.keyboard.release(Key.media_volume_up)
+            if platform.system() == "Linux":
+                os.system("pactl set-sink-volume @DEFAULT_SINK@ +5%")
+            else:
+                self.keyboard.press(Key.media_volume_up)
+                self.keyboard.release(Key.media_volume_up)
         elif action == "volume_down":
-            self.keyboard.press(Key.media_volume_down)
-            self.keyboard.release(Key.media_volume_down)
+            if platform.system() == "Linux":
+                os.system("pactl set-sink-volume @DEFAULT_SINK@ -5%")
+            else:
+                self.keyboard.press(Key.media_volume_down)
+                self.keyboard.release(Key.media_volume_down)
         elif action == "volume_toggle_mute":
-            self.keyboard.press(Key.media_volume_mute)
-            self.keyboard.release(Key.media_volume_mute)
+            if platform.system() == "Linux":
+                os.system("pactl set-sink-mute @DEFAULT_SINK@ toggle")
+            else:
+                self.keyboard.press(Key.media_volume_mute)
+                self.keyboard.release(Key.media_volume_mute)
 
         return "OK"
 
@@ -346,4 +410,7 @@ def main():
 
 # Run the app
 if __name__ == "__main__":
+    if is_wayland():
+        #force PyQt5 to use X11 for the GUI window if os uses wayland
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
     main()
