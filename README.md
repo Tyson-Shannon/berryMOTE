@@ -5,8 +5,9 @@ Same remote functionality as seen in the [berryTV](https://github.com/Tyson-Shan
 | Version  | Version Name | Release Date | Download Link | OS Supported |
 | --- | --- | --- | --- | --- |
 | v1.0.0 | June Berry | 2025-06-21 | [https://github.com/Tyson-Shannon/berryMOTE/releases/download/v1.0.0/berryMOTE.exe](https://github.com/Tyson-Shannon/berryMOTE/releases/download/v1.0.0/berryMOTE.exe) | Windows |
-| v1.1.0 | June Berry | 2025-08-03 | [https://github.com/Tyson-Shannon/berryMOTE/releases/download/v1.1.0/berryMOTE.exe](https://github.com/Tyson-Shannon/berryMOTE/releases/download/v1.1.0/berryMOTE.exe) | Linux*, Windows |
+| v1.1.0 | June Berry | 2025-08-03 | [https://github.com/Tyson-Shannon/berryMOTE/releases/download/v1.1.0/berryMOTE.exe](https://github.com/Tyson-Shannon/berryMOTE/releases/download/v1.1.0/berryMOTE.exe) | Windows, Linux* |
 
+*For Linux download and run source code not .exe file. Things break with Wine.<br/>
 *Wayland on Linux can cause some functionality issues that require extra steps (see common errors below)<br/><br/>
 
 ![image](https://github.com/user-attachments/assets/8ad0834a-85b5-48aa-976d-4b03fa165142) <br/><br/>
