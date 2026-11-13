@@ -1,342 +1,194 @@
 '''
 berryMOTE
-v1.1.0
-Version Name: June Berry (V1)
+v2.0.0
+Version Name: Goose Berry (V2)
 By Tyson Shannon
 
-A server to host a remote control for you're computer 
-(Linux compatible)
+A server to host a remote control for your computer
+(Linux, Windows and macOS)
 '''
-import sys
+import argparse
 import os
-import platform
-import subprocess
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
 import socket
-from flask import Flask, render_template_string, request
-from pynput.mouse import Controller as MouseController, Button
-from pynput.keyboard import Controller as KeyboardController, Key
-import threading
+import sys
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QPixmap
+from PySide6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+from Remote import Remote
+
+
+VERSION = "2.0.0"
+
 
 #environment detection to determine if os uses wayland or not
 def is_wayland():
     return bool(os.environ.get("WAYLAND_DISPLAY")) and not os.environ.get("DISPLAY")
 
-#ydotool wayland functions
-def ydotool_cmd(*args):
-    #Run ydotool command if available
-    try:
-        subprocess.run(["ydotool"] + list(args), check=True)
-    except Exception as e:
-        print("ydotool error:", e)
-def ydotool_move(dx, dy):
-    #move relative
-    ydotool_cmd("mousemove", "--", str(dx), str(dy))
-def ydotool_click(button="left"):
-    if button == "left":
-        ydotool_cmd("click", "0")
-    else:
-        ydotool_cmd("click", "1")
-def ydotool_type(text):
-    #type text one character at a time
-    for ch in text:
-        ydotool_cmd("type", ch)
 
-#get resource path
 def resource_path(relative_path):
-    try:
-        #when bundled with PyInstaller
-        base_path = sys._MEIPASS
-    except AttributeError:
-        #when running in a normal Python environment
-        base_path = os.path.abspath(".")
-
+    #when bundled with PyInstaller
+    base_path = getattr(sys, "_MEIPASS", None)
+    if base_path is None:
+        #when running from source, look next to this file
+        base_path = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_path, relative_path)
 
-#remote
-class Remote:
-    def __init__(self):
-        self.app = Flask(__name__)
-        self.mouse = MouseController()
-        self.keyboard = KeyboardController()
-        self.shutdown_event = threading.Event()
 
-        # HTML template with virtual trackpad and live keystroke input
-        self.HTML_TEMPLATE = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <link rel="icon" href="/static/berryLogo.png" type="image/png">
-            <title>berryMOTE</title>
-            <style>
-                body {
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    height: 100vh;
-                    background-color: #f4f4f4;
-                    margin: 0;
-                    font-family: Arial, sans-serif;
-                }
-                .container {
-                    text-align: center;
-                    width: 90%;
-                    max-width: 400px;
-                    background: white;
-                    padding: 20px;
-                    border-radius: 10px;
-                    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-                }
-                button {
-                    width: 100%;
-                    padding: 15px;
-                    font-size: 18px;
-                    border: none;
-                    background-color: #5E17EB;
-                    color: white;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    margin-top: 10px;
-                }
-                button:hover {
-                    background-color: rgb(82, 17, 212);
-                }
-                .button-row {
-                    display: flex;
-                    gap: 10px;
-                    margin-top: 10px;
-                }
-                .button-row button {
-                    flex: 1;
-                }
-                .volume-row {
-                    display: flex;
-                    gap: 10px;
-                    margin-top: 10px;
-                }
-                .volume-row button {
-                    flex: 1;
-                }
-                #trackpad {
-                    width: 100%;
-                    height: 200px;
-                    background: #eee;
-                    border: 2px dashed #ccc;
-                    border-radius: 10px;
-                    margin-bottom: 20px;
-                    touch-action: none;
-                }
-                #keystroke-catcher {
-                    border: 1px solid #ccc;
-                    padding: 10px;
-                    height: 50px;
-                    overflow-y: auto;
-                    outline: none;
-                    margin-top: 10px;
-                }
-            </style>
-            <script>
-                function sendAction(action, data = "") {
-                    fetch("/action", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action, data })
-                    });
-                }
+def remote_port():
+    try:
+        port = int(os.environ.get("BERRYMOTE_PORT", "5000"))
+    except ValueError:
+        return 5000
+    return port if 1 <= port <= 65535 else 5000
 
-                function handleMove(x, y) {
-                    if (!isTouching) return;
-                    const dx = x - lastX;
-                    const dy = y - lastY;
-                    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-                        sendAction("move", { dx: dx, dy: dy });
-                        lastX = x;
-                        lastY = y;
-                    }
-                }
 
-                let isTouching = false;
-                let lastX = 0;
-                let lastY = 0;
+def _say(message):
+    """Print when a console is attached (PyInstaller --windowed has none)."""
+    stream = sys.stdout
+    if stream is None:
+        return
+    try:
+        print(message, flush=True)
+    except Exception:
+        pass
 
-                window.onload = () => {
-                    const trackpad = document.getElementById("trackpad");
-                    const catcher = document.getElementById("keystroke-catcher");
-                    catcher.focus();
 
-                    catcher.addEventListener("keydown", (e) => {
-                        e.preventDefault(); // Prevent displaying text
+def _ensure_std_streams():
+    """Give argparse and logging something to write to in windowed builds."""
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
 
-                        const key = e.key;
-                        if (key === "Enter") {
-                            sendAction("type", "\\n");
-                        } else if (key === "Backspace") {
-                            sendAction("backspace");
-                        } else if (key.length === 1) {
-                            sendAction("type", key);
-                        }
-                    });
 
-                    trackpad.addEventListener("mousedown", (e) => {
-                        isTouching = true;
-                        lastX = e.clientX;
-                        lastY = e.clientY;
-                    });
+def _qt_check():
+    """Load Qt and a platform plugin without opening a window."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([sys.argv[0]])
+    app.quit()
 
-                    trackpad.addEventListener("mousemove", (e) => {
-                        if (isTouching) handleMove(e.clientX, e.clientY);
-                    });
 
-                    trackpad.addEventListener("mouseup", () => {
-                        isTouching = false;
-                    });
+def self_test():
+    """Start the remote headlessly and verify the packaged data files."""
+    import json
+    import urllib.request
 
-                    trackpad.addEventListener("mouseleave", () => {
-                        isTouching = false;
-                    });
+    _say("berryMOTE " + VERSION)
+    try:
+        _qt_check()
+    except Exception as exc:
+        _say("FAIL: Qt platform plugin: " + str(exc))
+        return 1
+    _say("ok: Qt platform plugin")
 
-                    trackpad.addEventListener("touchstart", (e) => {
-                        isTouching = true;
-                        const touch = e.touches[0];
-                        lastX = touch.clientX;
-                        lastY = touch.clientY;
-                    });
+    remote = Remote(host="127.0.0.1", port=0)
+    try:
+        remote.start()
+    except Exception as exc:
+        _say("FAIL: could not start the remote server: " + str(exc))
+        remote.shutdown()
+        return 1
 
-                    trackpad.addEventListener("touchmove", (e) => {
-                        const touch = e.touches[0];
-                        handleMove(touch.clientX, touch.clientY);
-                    });
+    base = "http://127.0.0.1:" + str(remote.port)
+    _say("remote: " + base)
+    _say(
+        "input backend: "
+        + (remote.backend.name if remote.backend else "unavailable")
+    )
+    if remote.backend_error:
+        _say("input detail: " + remote.backend_error.splitlines()[0])
+    _say("audio backend: " + (remote.audio.backend or "unavailable"))
 
-                    trackpad.addEventListener("touchend", () => {
-                        isTouching = false;
-                    });
-                };
-            </script>
-        </head>
-        <body>
-            <div class="container">
-                <h2>berryMOTE</h2>
-                <h3>Trackpad</h3>
-                <div id="trackpad"></div>
-                <div class="button-row">
-                    <button onclick="sendAction('click')">Left Click</button>
-                    <button onclick="sendAction('right_click')">Right Click</button>
-                </div>
-                <button onclick="sendAction('scroll_up')">Scroll Up</button>
-                <button onclick="sendAction('scroll_down')">Scroll Down</button>
-                <div class="volume-row">
-                    <button onclick="sendAction('volume_down')">🔉</button>
-                    <button onclick="sendAction('volume_toggle_mute')">🔇</button>
-                    <button onclick="sendAction('volume_up')">🔊</button>
-                </div>
-                <div id="keystroke-catcher" contenteditable="true">Tap here and start typing...</div>
-            </div>
-        </body>
-        </html>
-        """
+    checks = []
+    try:
+        try:
+            with urllib.request.urlopen(base + "/health", timeout=5) as response:
+                health = json.loads(response.read().decode("utf-8"))
+            checks.append(
+                ("health endpoint", response.status == 200 and bool(health.get("ok")))
+            )
+        except Exception as exc:
+            _say("FAIL: health endpoint: " + str(exc))
+            return 1
 
-        self.app.add_url_rule("/", "index", self.index)
-        self.app.add_url_rule("/action", "action", self.action, methods=["POST"])
+        try:
+            with urllib.request.urlopen(base + "/", timeout=5) as response:
+                page = response.read()
+            checks.append(
+                (
+                    "remote page and templates",
+                    response.status == 200 and b"berryMOTE" in page,
+                )
+            )
+        except Exception as exc:
+            _say("FAIL: remote page: " + str(exc))
+            return 1
 
-    def index(self):
-        return render_template_string(self.HTML_TEMPLATE)
+        try:
+            with urllib.request.urlopen(
+                base + "/static/berryLogo.png", timeout=5
+            ) as response:
+                logo = response.read()
+            checks.append(
+                ("static files", response.status == 200 and bool(logo))
+            )
+        except Exception as exc:
+            _say("FAIL: static files: " + str(exc))
+            return 1
 
-    def action(self):
-        data = request.get_json()
-        action = data.get("action")
-        key_data = data.get("data", "")
+        try:
+            with urllib.request.urlopen(base + "/login", timeout=5) as response:
+                login_page = response.read()
+            checks.append(
+                (
+                    "login template",
+                    response.status == 200 and b"berryMOTE" in login_page,
+                )
+            )
+        except Exception as exc:
+            _say("FAIL: login template: " + str(exc))
+            return 1
 
-        #if wayland detected
-        if is_wayland():
-            if action == "move":
-                dx = key_data.get("dx", 0)
-                dy = key_data.get("dy", 0)
-                factor = 1.0 #sensitivity boost
-                ydotool_move(int(dx * factor), int(dy * factor))
-            elif action == "click":
-                ydotool_click("left")
-            elif action == "right_click":
-                ydotool_click("right")
-            elif action == "scroll_up":
-                ydotool_cmd("mousemove", "0", "-50")
-            elif action == "scroll_down":
-                ydotool_cmd("mousemove", "0", "50")
-            elif action == "type" and key_data:
-                ydotool_type(key_data)
-            elif action == "backspace":
-                ydotool_cmd("key", "14")
-            elif action == "volume_up":
-                os.system("pactl set-sink-volume @DEFAULT_SINK@ +5%")
-            elif action == "volume_down":
-                os.system("pactl set-sink-volume @DEFAULT_SINK@ -5%")
-            elif action == "volume_toggle_mute":
-                os.system("pactl set-sink-mute @DEFAULT_SINK@ toggle")
-            return "OK"
+        checks.append(
+            ("window image", os.path.isfile(resource_path("berryTV.png")))
+        )
 
-        #if NO wayland detected (X11/Windows)
-        if action == "move":
-            dx = key_data.get("dx", 0)
-            dy = key_data.get("dy", 0)
-            x, y = self.mouse.position
-            self.mouse.position = (x + dx, y + dy)
-        elif action == "click":
-            self.mouse.click(Button.left, 1)
-        elif action == "right_click":
-            self.mouse.click(Button.right, 1)
-        elif action == "scroll_up":
-            self.mouse.scroll(0, 2)
-        elif action == "scroll_down":
-            self.mouse.scroll(0, -2)
-        elif action == "type" and key_data:
-            self.keyboard.type(key_data)
-        elif action == "backspace":
-            self.keyboard.press(Key.backspace)
-            self.keyboard.release(Key.backspace)
-        elif action == "volume_up":
-            if platform.system() == "Linux":
-                os.system("pactl set-sink-volume @DEFAULT_SINK@ +5%")
-            else:
-                self.keyboard.press(Key.media_volume_up)
-                self.keyboard.release(Key.media_volume_up)
-        elif action == "volume_down":
-            if platform.system() == "Linux":
-                os.system("pactl set-sink-volume @DEFAULT_SINK@ -5%")
-            else:
-                self.keyboard.press(Key.media_volume_down)
-                self.keyboard.release(Key.media_volume_down)
-        elif action == "volume_toggle_mute":
-            if platform.system() == "Linux":
-                os.system("pactl set-sink-mute @DEFAULT_SINK@ toggle")
-            else:
-                self.keyboard.press(Key.media_volume_mute)
-                self.keyboard.release(Key.media_volume_mute)
+        failed = False
+        for name, ok in checks:
+            _say(("ok: " if ok else "FAIL: ") + name)
+            failed = failed or not ok
+        return 1 if failed else 0
+    finally:
+        remote.shutdown()
 
-        return "OK"
-
-    def shutdown(self):
-        self.shutdown_event.set()
-        return "Shutting down server..."
-
-    def run(self):
-        server_thread = threading.Thread(target=self._run_server)
-        server_thread.start()
-        self.shutdown_event.wait()
-        print("Remote Flask server shut down.")
-        
-    def _run_server(self):
-        self.app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
 
 #interface
 class gui(QWidget):
    def __init__(self, parent = None):
-      #start remote
-      self.remote = Remote()
-      threading.Thread(target=self.remote.run, daemon=True).start()
-      #intro screen
       super(gui, self).__init__(parent)
+
+      #start remote
+      self.remote_error = ""
+      self.remote = Remote(
+          port=remote_port(),
+          pin=os.environ.get("BERRYMOTE_PIN", "").strip(),
+      )
+      try:
+          self.remote.start()
+      except OSError as exc:
+          self.remote_error = str(exc)
+          _say("berryMOTE: could not start remote: " + str(exc))
+
+      #intro screen
       width = 1200
       height = 400
       self.setFixedSize(width, height)
@@ -345,7 +197,7 @@ class gui(QWidget):
       layout = QHBoxLayout(self)
       layout.setContentsMargins(50, 50, 50, 50)
       layout.setSpacing(20)
-      #left side 
+      #left side
       self.label = QLabel(self)
       self.OG_pixmap = QPixmap(resource_path("berryTV.png"))
       pixmap = self.OG_pixmap.scaledToWidth(width // 2, Qt.SmoothTransformation)
@@ -358,7 +210,12 @@ class gui(QWidget):
       self.ip_label.setFont(ip_font)
       self.ip_label.setStyleSheet("color: #FFFFFF;")
       self.ip_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-      self.ip_label.setText("Remote: http://" + self.get_local_ip() + ":5000")
+      if self.remote_error:
+          self.ip_label.setText("Remote could not start:\n" + self.remote_error)
+      else:
+          self.ip_label.setText(
+              "Remote: http://" + self.get_local_ip() + ":" + str(self.remote.port)
+          )
       #right side vertical wrap
       right_layout = QVBoxLayout()
       right_layout.addStretch()
@@ -385,7 +242,7 @@ class gui(QWidget):
       right_layout.addWidget(self.shutdown_button)
 
       self.setLayout(layout)
-    
+
    def get_local_ip(self):
        #get ip for the remote control webserver
       s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -403,14 +260,37 @@ class gui(QWidget):
        self.close()
 
 def main():
-   app = QApplication(sys.argv)
+   _ensure_std_streams()
+   parser = argparse.ArgumentParser(
+       prog="berryMOTE",
+       description="A local network remote control for your computer.",
+   )
+   parser.add_argument(
+       "--self-test",
+       "--doctor",
+       dest="self_test",
+       action="store_true",
+       help="start the remote headlessly, verify the install, then exit",
+   )
+   parser.add_argument(
+       "--version",
+       action="version",
+       version="%(prog)s " + VERSION,
+   )
+   args = parser.parse_args()
+
+   if args.self_test:
+       return self_test()
+
+   if is_wayland():
+       #force Qt to use X11 for the GUI window if os uses wayland
+       os.environ["QT_QPA_PLATFORM"] = "xcb"
+
+   app = QApplication([sys.argv[0]])
    introWindow = gui()
    introWindow.show()
-   sys.exit(app.exec_())
+   return app.exec()
 
 # Run the app
 if __name__ == "__main__":
-    if is_wayland():
-        #force PyQt5 to use X11 for the GUI window if os uses wayland
-        os.environ["QT_QPA_PLATFORM"] = "xcb"
-    main()
+    raise SystemExit(main())
