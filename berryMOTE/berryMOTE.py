@@ -13,7 +13,7 @@ import socket
 import sys
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QPixmap
+from PySide6.QtGui import QFont, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -108,7 +108,7 @@ def self_test():
         _say("input detail: " + remote.backend_error.splitlines()[0])
     _say("audio backend: " + (remote.audio.backend or "unavailable"))
 
-    checks = []
+    checks = [("application icon", not QIcon(resource_path("berryLogo.png")).isNull())]
     try:
         try:
             with urllib.request.urlopen(base + "/health", timeout=5) as response:
@@ -287,6 +287,10 @@ def main():
        os.environ["QT_QPA_PLATFORM"] = "xcb"
 
    app = QApplication([sys.argv[0]])
+   app.setApplicationName("berryMOTE")
+   app.setApplicationDisplayName("berryMOTE")
+   app.setDesktopFileName("berryMOTE")
+   app.setWindowIcon(QIcon(resource_path("berryLogo.png")))
    introWindow = gui()
    introWindow.show()
    return app.exec()

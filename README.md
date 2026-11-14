@@ -41,6 +41,7 @@ pip install -r requirements-dev.txt
 
 python scripts/build.py             # single-file executable
 python scripts/build.py --onedir    # executable plus support folder
+python scripts/build.py --appimage  # Linux AppImage (implies --onedir)
 python scripts/build.py --console   # debug build with a console window
 ```
 
@@ -48,6 +49,16 @@ The output is written to `dist/`:
 
 - Windows: `dist/berryMOTE.exe`
 - Linux: `dist/berryMOTE`
+- Linux folder build: `dist/berryMOTE-onedir/`
+- Linux AppImage: `dist/berryMOTE-linux-x64.AppImage`
+
+The AppImage is the recommended Linux download: it is a single file with the
+desktop icon and launcher entry included. Install `appimagetool` first, or
+point the build at it:
+
+```bash
+APPIMAGETOOL=/path/to/appimagetool python scripts/build.py --appimage
+```
 
 The single-file build extracts its libraries to a temporary directory at
 launch, so it starts a little slower than the `--onedir` build. On minimal
@@ -55,6 +66,12 @@ Linux installs, Qt also needs a few system libraries:
 
 ```bash
 sudo apt install libgl1 libegl1 libxkbcommon-x11-0 libxcb-cursor0
+```
+
+If FUSE is unavailable, an AppImage can still be run with:
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./dist/berryMOTE-linux-x64.AppImage
 ```
 
 Verify a build with its built-in headless self-test:

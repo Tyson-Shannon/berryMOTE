@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=berryMOTE
+GenericName=Remote Control
+Comment=Control your computer from a phone or tablet
+Exec=berryMOTE
+Icon=berryMOTE
+Terminal=false
+Categories=Utility;Network;
+StartupWMClass=berryMOTE

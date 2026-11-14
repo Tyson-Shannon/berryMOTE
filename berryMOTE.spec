@@ -18,6 +18,7 @@ datas = [
     (os.path.join(PACKAGE, "templates"), "templates"),
     (os.path.join(PACKAGE, "static"), "static"),
     (os.path.join(PACKAGE, "berryTV.png"), "."),
+    (os.path.join(PACKAGE, "berryLogo.png"), "."),
 ]
 
 for source, destination in (
@@ -103,5 +104,5 @@ else:
         strip=False,
         upx=False,
         upx_exclude=[],
-        name="berryMOTE",
+        name="berryMOTE-onedir",
     )
