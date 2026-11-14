@@ -33,11 +33,16 @@ def parse_args() -> argparse.Namespace:
         help="create an executable plus a support folder",
     )
     parser.add_argument(
+        "--appimage",
+        action="store_true",
+        help="build a Linux AppImage (implies --onedir)",
+    )
+    parser.add_argument(
         "--console",
         action="store_true",
         help="keep a console window for debugging",
     )
-    parser.set_defaults(onefile=True)
+    parser.set_defaults(onefile=None)
     return parser.parse_args()
 
 
@@ -45,11 +50,22 @@ def built_path(onefile: bool) -> Path:
     executable = "berryMOTE.exe" if sys.platform.startswith("win") else "berryMOTE"
     if onefile:
         return ROOT / "dist" / executable
-    return ROOT / "dist" / "berryMOTE" / executable
+    return ROOT / "dist" / "berryMOTE-onedir" / executable
 
 
 def main() -> int:
     args = parse_args()
+
+    if args.appimage:
+        if not sys.platform.startswith("linux"):
+            print("--appimage is only supported on Linux.", file=sys.stderr)
+            return 1
+        if args.onefile is True:
+            print("--appimage cannot be combined with --onefile.", file=sys.stderr)
+            return 1
+        args.onefile = False
+    elif args.onefile is None:
+        args.onefile = True
 
     if importlib.util.find_spec("PyInstaller") is None:
         print(
@@ -82,6 +98,17 @@ def main() -> int:
         return 1
 
     print(f"Built {target}")
+
+    if args.appimage:
+        appimage_script = ROOT / "scripts" / "build_appimage.py"
+        result = subprocess.run(
+            [sys.executable, str(appimage_script)],
+            cwd=ROOT,
+            env=env,
+        )
+        if result.returncode != 0:
+            return result.returncode
+
     return 0
 
 

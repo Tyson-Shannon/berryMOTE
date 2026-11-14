@@ -21,13 +21,9 @@ jobs:
           - name: Windows x64
             os: windows-latest
             artifact: berryMOTE-windows-x64
-            executable: dist/berryMOTE.exe
-            checksum: dist/berryMOTE.exe.sha256
           - name: Linux x64
             os: ubuntu-22.04
             artifact: berryMOTE-linux-x64
-            executable: dist/berryMOTE
-            checksum: dist/berryMOTE.sha256
 
     steps:
       - uses: actions/checkout@v4
@@ -52,11 +48,30 @@ jobs:
       - name: Build single-file executable
         run: python scripts/build.py
 
+      - name: Install appimagetool
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL -o /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+
+      - name: Build Linux AppImage
+        if: runner.os == 'Linux'
+        env:
+          APPIMAGETOOL: /tmp/appimagetool
+        run: python scripts/build.py --appimage
+
       - name: Self-test (Linux)
         if: runner.os == 'Linux'
         env:
           QT_QPA_PLATFORM: offscreen
         run: timeout 120 ./dist/berryMOTE --self-test
+
+      - name: Self-test AppImage (Linux)
+        if: runner.os == 'Linux'
+        env:
+          QT_QPA_PLATFORM: offscreen
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: timeout 120 ./dist/berryMOTE-linux-x64.AppImage --self-test
 
       - name: Self-test (Windows)
         if: runner.os == 'Windows'
@@ -72,40 +87,66 @@ jobs:
             throw "Self-test failed with exit code $($process.ExitCode)"
           }
 
-      - name: Generate checksum
+      - name: Generate checksums
         shell: python
         run: |
           import hashlib
           from pathlib import Path
 
-          target = next(
-              path
-              for path in (Path("dist/berryMOTE.exe"), Path("dist/berryMOTE"))
-              if path.is_file()
-          )
-          digest = hashlib.sha256(target.read_bytes()).hexdigest()
-          checksum = target.with_name(target.name + ".sha256")
-          checksum.write_text(f"{digest}  {target.name}\n", encoding="ascii")
-          print(f"{target}: {digest}")
+          for target in sorted(Path("dist").glob("berryMOTE*")):
+              if not target.is_file() or target.name.endswith(".sha256"):
+                  continue
+              digest = hashlib.sha256(target.read_bytes()).hexdigest()
+              checksum = target.with_name(target.name + ".sha256")
+              checksum.write_text(f"{digest}  {target.name}\n", encoding="ascii")
+              print(f"{target}: {digest}")
 
-      - name: Upload build artifact
+      - name: Upload Linux artifact
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: |
-            ${{ matrix.executable }}
-            ${{ matrix.checksum }}
+            dist/berryMOTE
+            dist/berryMOTE.sha256
+            dist/berryMOTE-linux-x64.AppImage
+            dist/berryMOTE-linux-x64.AppImage.sha256
             THIRD_PARTY_NOTICES.md
             LICENSES/LGPL-3.0.txt
             LICENSE
 
-      - name: Upload release asset
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Upload Windows artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            dist/berryMOTE.exe
+            dist/berryMOTE.exe.sha256
+            THIRD_PARTY_NOTICES.md
+            LICENSES/LGPL-3.0.txt
+            LICENSE
+
+      - name: Upload Linux release assets
+        if: startsWith(github.ref, 'refs/tags/v') && runner.os == 'Linux'
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ${{ matrix.executable }}
-            ${{ matrix.checksum }}
+            dist/berryMOTE
+            dist/berryMOTE.sha256
+            dist/berryMOTE-linux-x64.AppImage
+            dist/berryMOTE-linux-x64.AppImage.sha256
+            THIRD_PARTY_NOTICES.md
+            LICENSES/LGPL-3.0.txt
+            LICENSE
+
+      - name: Upload Windows release assets
+        if: startsWith(github.ref, 'refs/tags/v') && runner.os == 'Windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/berryMOTE.exe
+            dist/berryMOTE.exe.sha256
             THIRD_PARTY_NOTICES.md
             LICENSES/LGPL-3.0.txt
             LICENSE
