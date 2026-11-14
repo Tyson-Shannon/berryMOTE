@@ -10,12 +10,20 @@ berryMOTE uses PySide6 (LGPL) for its desktop window, along with Flask and pynpu
 | --- | --- | --- | --- | --- |
 | v1.0.0 | June Berry | 2025-06-21 | [https://github.com/Tyson-Shannon/berryMOTE/releases/download/v1.0.0/berryMOTE.exe](https://github.com/Tyson-Shannon/berryMOTE/releases/download/v1.0.0/berryMOTE.exe) | Windows |
 | v1.1.0 | June Berry | 2025-08-03 | [https://github.com/Tyson-Shannon/berryMOTE/releases/download/v1.1.0/berryMOTE.exe](https://github.com/Tyson-Shannon/berryMOTE/releases/download/v1.1.0/berryMOTE.exe) | Windows, Linux* |
+| v2.0.0 | Goose Berry | 2026-11-13 | [https://github.com/Tyson-Shannon/berryMOTE/releases/download/v2.0.0/berryMOTE-windows-x64.zip](https://github.com/Tyson-Shannon/berryMOTE/releases/download/v2.0.0/berryMOTE-windows-x64.zip) | Windows |
+| v2.0.0 | Goose Berry | 2026-11-13 | [https://github.com/Tyson-Shannon/berryMOTE/releases/download/v2.0.0/berryMOTE-linux-x64.zip](https://github.com/Tyson-Shannon/berryMOTE/releases/download/v2.0.0/berryMOTE-linux-x64.zip) | Linux |
 
-*On Linux use the Linux release binary or run from source. The Windows .exe is not supported under Wine.<br/>
-*Wayland on Linux can cause some functionality issues that require extra steps (see common errors below)<br/><br/>
+*Linux v1 releases will only work using the source code, the Windows .exe will not work with Wine. Wayland may also cause functionality issues on older releases (see common errors below).
+<br/><br/>
+**NOTE:** For releases v2+ the executables are located in the **dist** folder in the zip file.
+<br/><br/>
 
+## Screenshots
+Launch the app
 ![image](https://github.com/user-attachments/assets/8ad0834a-85b5-48aa-976d-4b03fa165142) <br/><br/>
-<img src="https://github.com/user-attachments/assets/4022920a-eab3-4a3e-895a-d09decce7954" alt="remote" style="width:50%; height:auto;">
+Access the remote from the local ip address through any browser<br/>
+<img width="540" height="1024.5" alt="Screenshot_20261113_234848_Firefox" src="https://github.com/user-attachments/assets/6e746e6d-8f59-48ab-8f08-8803b6b3a672" />
+
 <br/><br/>
 
 ## Run from source
